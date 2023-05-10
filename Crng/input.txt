@@ -1,0 +1,71 @@
+int x[32]; 
+int sz;
+
+func int max(int a, int b) {
+	if (a > b) {
+		return a;
+	}
+	return b;
+}
+
+func void upd(int v, int z) {
+	v = v + sz;
+	x[v] = z;
+	while(v > 1) {
+		v = v / 2;
+		x[v] = max(x[v * 2], x[v * 2 + 1]);
+	}
+}
+
+func int mx(int v, int l, int r, int ql, int qr) {
+	if (l + 1 > qr or r - 1 < ql) {
+		return 0;
+	}
+	if (ql < l + 1 and r - 1 < qr) {
+		return x[v];
+	}
+	int m;
+	m = (l + r) / 2;
+	int a;
+	int b;
+	a = mx(v * 2, l, m, ql, qr);
+	b = mx(v * 2 + 1, m, r, ql, qr);
+	return max(a, b);
+}
+
+func int main() {
+	int i;
+	for (i = 0; i < 32; i = i + 1) {
+		x[i] = 0;
+	}
+	sz = 32 / 2;
+	int n;
+	cin(n);
+	for (i = 0; i < n; i = i + 1) {
+		int x;
+		cin(x);
+		upd(i, x);
+	}
+	int q;
+	cin(q);
+	while (q != 0) {
+		int t;
+		cin(t);
+		if (t == 1) {
+			int i;
+			int z;
+			cin(i);
+			cin(z);
+			upd(i, z);
+		}
+		else {
+			int l;
+			int r;
+			cin(l);
+			cin(r);
+			cout(mx(1, 0, sz, l, r + 1));
+			cout("\n");
+		}
+		q = q - 1;
+	}
+}

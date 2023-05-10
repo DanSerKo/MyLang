@@ -132,6 +132,7 @@ private:
 struct ParFunc {
 	std::string MyType;
 	std::vector <std::string> ArgumType;
+	std::vector <std::string> ArgumName;
 };
 
 class TableToFunc {
@@ -142,12 +143,13 @@ public:
 		table[name].MyType = type;
 		NowFunc = name;
 	}
-	void AddArguments(std::string type) {
+	void AddArguments(std::string name, std::string type) {
+		table[NowFunc].ArgumName.push_back(name);
 		table[NowFunc].ArgumType.push_back(type);
 	}
 	ParFunc GetParFunc(std::string name) {
 		if (!table.count(name)) {
-			throw std::string("function " + name + "not declared");
+			throw std::string("function " + name + " not declared");
 		}
 		return table[name];
 	}

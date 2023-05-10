@@ -2,6 +2,7 @@
 #include "SemanticAnalyzer.h"
 #include "Comp.h"
 
+int Pred = 0;
 TID Tree;
 ControlTypes Control;
 TableToFunc FuncControl;
@@ -33,7 +34,7 @@ void Start();
 void inGlobal();
 void Func();
 void Arguments(); 
-void Declare(); 
+void Declare(bool f); 
 void While();
 void If();
 void Else();
@@ -54,8 +55,10 @@ void Expression5();
 void Expression6();
 
 void Block(bool flag = 1) {
-	if (flag)
+	if (flag) {
+		Poliz.push_back({ types::Unknow, "newTIDtoE" });
 		Tree.CreateTID();
+	}
 	if (NowLexeme.name != "{")
 		Error();
 	nxt();
@@ -81,28 +84,44 @@ void Block(bool flag = 1) {
 		else if (NowLexeme.name == "return")
 			Return();
 		else if (NowLexeme.type == types::KEYWORD)
-			Declare();
+			Declare(0);
 		else
 			Assign();
 		if (NowLexeme.name != ";")
 			Error();
 		nxt();
 	}
-	if (flag)
+	if (flag) {
+		Poliz.push_back({ types::Unknow, "upTIDtoE" });
 		Tree.UpTree();
+	}
 }
 
 
-void Data() {
+void Data() { 
 	if (NowLexeme.type != types::IDENTIFIER)
 		Error();
 	auto now = NowLexeme;
 	nxt();
 	if (NowLexeme.name == "(") {
+		Poliz.push_back({ types::Unknow, "NewTID" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Poliz.size() + 4) });
+		Poliz.push_back({ types::Unknow, "NewGO" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Registry[now.name].first) });
+		Poliz.push_back({ types::Jump, "!" });
 		nxt();
 		std::vector <std::string> param;
+		int k = 0;
+		auto ArgumName = FuncControl.GetParFunc(now.name).ArgumName;
 		while (NowLexeme.name != ")") {
+			Poliz.push_back({ types::IDENTIFIER, ArgumName[k]});
+			Poliz.push_back({ types::NUMBER, "0" });
+			Poliz.push_back({ types::Unknow, "&" });			
+			Pred = 1;
 			Expression();
+			Pred = 0;
+			Poliz.push_back({ types::KEYWORD, "=" });
+			k++;
 			param.push_back(Control.GetType());
 			if (NowLexeme.name == ")")
 				continue;
@@ -110,6 +129,10 @@ void Data() {
 				Error();
 			nxt();
 		}
+		Poliz.push_back({ types::NUMBER, std::to_string(Poliz.size() + 4) });
+		Poliz.push_back({ types::Unknow, "NewGO" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Registry[now.name].second) });
+		Poliz.push_back({ types::Jump, "!" });
 		nxt();
 		if (param != FuncControl.GetParFunc(now.name).ArgumType) {
 			throw std::string("invalid function arguments in line ") + std::to_string(now.x + 1);
@@ -117,6 +140,9 @@ void Data() {
 		Control.Push(FuncControl.GetParFunc(now.name).MyType);
 		return;
 	}
+	if (Pred)
+		Poliz.push_back({ types::Unknow, "0pred" });
+	Poliz.push_back(now);
 	int k = 0;
 	while (NowLexeme.name == "[") {
 		k++;
@@ -132,6 +158,8 @@ void Data() {
 		}
 		Error();
 	}
+	Poliz.push_back({ types::NUMBER, std::to_string(k) });
+	Poliz.push_back({ types::Unknow, "build" });
 	Control.Push(Tree.GetType(now.name).type);
 	if (k != Tree.GetType(now.name).Dim)
 		throw std::string("incorrect dimensions in line ") + std::to_string(now.x + 1);
@@ -142,6 +170,7 @@ void String() {
 		nxt();
 		if (NowLexeme.name.size() != 1)
 			Error();
+		Poliz.push_back({ types::STRING, "'" + NowLexeme.name + "'" });
 		nxt();
 		if (NowLexeme.name != "'")
 			Error();
@@ -152,14 +181,25 @@ void String() {
 	if (NowLexeme.name != "\"")
 		Error();
 	nxt();
-	while (NowLexeme.name != "\"")
+	Poliz.push_back({ types::STRING, "\"" });
+	while (NowLexeme.name != "\"") {
+		Poliz.back().name += NowLexeme.name;
 		nxt();
+	}	
+	Poliz.back().name += "\"";
 	nxt();
 	Control.Push("string");
 }
 
 void Object() {
+	if (NowLexeme.name == "true" || NowLexeme.name == "false") {
+		Poliz.push_back(NowLexeme);
+		Control.Push("bool");
+		nxt();
+		return;
+	}
 	if (NowLexeme.type == types::NUMBER) {
+		Poliz.push_back(NowLexeme);
 		if (count(NowLexeme.name.begin(), NowLexeme.name.end(), '.')) {
 			Control.Push("float");
 		}
@@ -182,6 +222,71 @@ void Object() {
 std::string Variable() {
 	if (NowLexeme.type != types::IDENTIFIER)
 		Error();
+	auto now = NowLexeme;
+	nxt();
+	if (NowLexeme.name == "(") {
+		Poliz.push_back({ types::Unknow, "NewTID" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Poliz.size() + 4) });
+		Poliz.push_back({ types::Unknow, "NewGO" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Registry[now.name].first) });
+		Poliz.push_back({ types::Jump, "!" });
+		nxt();
+		std::vector <std::string> param;
+		int k = 0;
+		auto ArgumName = FuncControl.GetParFunc(now.name).ArgumName;
+		while (NowLexeme.name != ")") {
+			Poliz.push_back({ types::IDENTIFIER, ArgumName[k] });
+			Poliz.push_back({ types::NUMBER, "0" });
+			Poliz.push_back({ types::Unknow, "&" });
+			Pred = 1;
+			Expression();
+			Pred = 0;
+			Poliz.push_back({ types::KEYWORD, "=" });
+			k++;
+			param.push_back(Control.GetType());
+			if (NowLexeme.name == ")")
+				continue;
+			if (NowLexeme.name != ",")
+				Error();
+			nxt();
+		}
+		Poliz.push_back({ types::NUMBER, std::to_string(Poliz.size() + 4) });
+		Poliz.push_back({ types::Unknow, "NewGO" });
+		Poliz.push_back({ types::NUMBER, std::to_string(Registry[now.name].second) });
+		Poliz.push_back({ types::Jump, "!" });
+		nxt();
+		if (param != FuncControl.GetParFunc(now.name).ArgumType) {
+			throw std::string("invalid function arguments in line ") + std::to_string(now.x + 1);
+		}
+		Control.Push(FuncControl.GetParFunc(now.name).MyType);
+		return "IsFunc";
+	}
+	Poliz.push_back(now);
+	std::string NowType = Tree.GetType(now.name).type;
+	int k = 0;
+	while (NowLexeme.name == "[") {
+		k++;
+		nxt();
+		Expression();
+		std::string Get = Control.GetType();
+		if (Get != "int" && Get != "int64") {
+			Error();
+		}
+		if (NowLexeme.name == "]") {
+			nxt();
+			continue;
+		}
+		Error();
+	}
+	Poliz.push_back({ types::NUMBER, std::to_string(k) });
+	Poliz.push_back({ types::Unknow, "&" });
+	if (k != Tree.GetType(now.name).Dim)
+		throw std::string("incorrect dimensions in line ") + std::to_string(now.x + 1);
+	return NowType;
+	/*
+	if (NowLexeme.type != types::IDENTIFIER)
+		Error();
+	Poliz.push_back(NowLexeme);
 	std::string NowType = Tree.GetType(NowLexeme.name).type;
 	auto now = NowLexeme;
 	nxt();
@@ -200,9 +305,12 @@ std::string Variable() {
 		}
 		Error();
 	}
+	Poliz.push_back({ types::NUMBER, std::to_string(k) });
+	Poliz.push_back({ types::Unknow, "&" });
 	if (k != Tree.GetType(now.name).Dim)
 		throw std::string("incorrect dimensions in line ") + std::to_string(now.x + 1);
 	return NowType;
+	*/
 }
 
 void Return() {
@@ -210,6 +318,8 @@ void Return() {
 		Error();
 	nxt();
 	Expression();
+	Poliz.push_back({ types::Unknow, "CloseTID" });
+	Poliz.push_back({ types::Jump, "!GO" });
 	if (Control.GetType() != FuncControl.GetParFunc(FuncControl.GetFunc()).MyType)
 		throw std::string("incorrect type in line ") + std::to_string(NowLexeme.x + 1);		
 }
@@ -224,6 +334,7 @@ void Cout() {
 	Expression();
 	if (NowLexeme.name != ")")
 		Error();
+	Poliz.push_back({ types::KEYWORD, "cout" });
 	nxt();
 }
 
@@ -235,6 +346,8 @@ void Cin() {
 		Error();
 	nxt();
 	Variable();
+	Poliz.push_back({ types::KEYWORD, "cin" });
+	Poliz.push_back({ types::KEYWORD, "=" });
 	if (NowLexeme.name != ")")
 		Error();
 	nxt();
@@ -242,23 +355,13 @@ void Cin() {
 
 void Assign() {
 	auto NowType = Variable();
-	if (NowLexeme.name == "(") {
-		nxt();
-		while (NowLexeme.name != ")") {
-			Expression();
-			if (NowLexeme.name == ")")
-				continue;
-			if (NowLexeme.name != ",")
-				Error();
-			nxt();
-		}
-		nxt();
+	if (NowType == "IsFunc")
 		return;
-	}
 	if (NowLexeme.name != "=")
 		Error();
 	nxt();
-	Expression(); 
+	Expression();
+	Poliz.push_back({ types::KEYWORD, "=" });
 	std::string Type = Control.GetType();
 	if (Type != NowType) {
 		if ((NowType == "int" || NowType == "int64" || NowType == "float") 
@@ -275,13 +378,20 @@ void While() {
 	if (NowLexeme.name != "(")
 		Error();
 	nxt();
+	int p0 = Poliz.size();
 	Expression();
 	if (Control.GetType() != "bool")
 		Error();
 	if (NowLexeme.name != ")")
 		Error();
+	int p1 = Poliz.size();
+	Poliz.push_back({ types::NUMBER, "_" });
+	Poliz.push_back({ types::Jump, "F!" });
 	nxt();
 	Block();
+	Poliz.push_back({ types::NUMBER, std::to_string(p0)});
+	Poliz.push_back({ types::Jump, "!" });
+	Poliz[p1].name = std::to_string(Poliz.size());
 }
 
 void Else() {
@@ -303,16 +413,27 @@ void If() {
 		Error();
 	if (NowLexeme.name != ")")
 		Error();
+	int p1 = Poliz.size();
+	Poliz.push_back({ types::NUMBER, "_" });
+	Poliz.push_back({ types::Jump, "F!" });
+
 	nxt();
 	Block();
+
+
+	int p2 = Poliz.size();
+	Poliz.push_back({ types::NUMBER, "_" });
+	Poliz.push_back({ types::Jump, "!" });
 	nxt();
+	Poliz[p1].name = std::to_string(Poliz.size());
 	if (NowLexeme.name == "else") {
 		Else();
 		nxt();
 	}
+	Poliz[p2].name = std::to_string(Poliz.size());	
 }
 
-void For() {
+void For() { 
 	if (NowLexeme.name != "for")
 		Error();
 	nxt();
@@ -323,22 +444,38 @@ void For() {
 	if (NowLexeme.name != ";")
 		Error();
 	nxt();
+	int p0 = Poliz.size();
 	Expression();
+	int p1 = Poliz.size();
+	Poliz.push_back({ types::NUMBER, "_" });
+	Poliz.push_back({ types::Jump, "T!" });
+	int p2 = Poliz.size();
+	Poliz.push_back({ types::NUMBER, "_" });
+	Poliz.push_back({ types::Jump, "!" });
 	if (Control.GetType() != "bool")
 		Error();
 	if (NowLexeme.name != ";")
 		Error();
 	nxt();
+	int p3 = Poliz.size();
 	Assign();
+	Poliz.push_back({ types::NUMBER, std::to_string(p0) });
+	Poliz.push_back({ types::Jump, "!" });
 	if (NowLexeme.name != ")")
 		Error();
 	nxt();
+	Poliz[p1].name = std::to_string(Poliz.size());
 	Block();
+	Poliz.push_back({ types::NUMBER, std::to_string(p3) });
+	Poliz.push_back({ types::Jump, "!" });
+
+	Poliz[p2].name = std::to_string(Poliz.size());
 }
 
 void Expression6() {
-	if (NowLexeme.name != "(")
+	if (NowLexeme.name != "(") {
 		Object();
+	}
 	else {
 		nxt();
 		Expression();
@@ -352,6 +489,7 @@ void Expression5() {
 		auto Now = NowLexeme;
 		nxt();
 		Expression6();
+		Poliz.push_back(Now);
 		Control.Update(Now);
 	}
 }
@@ -362,6 +500,7 @@ void Expression4() {
 		auto Now = NowLexeme;
 		nxt();
 		Expression5();
+		Poliz.push_back(Now);
 		Control.Update(Now);
 	}
 }
@@ -372,6 +511,7 @@ void Expression3() {
 		auto Now = NowLexeme;
 		nxt();
 		Expression4();
+		Poliz.push_back(Now);
 		Control.Update(Now);
 	}
 }
@@ -382,6 +522,7 @@ void Expression2() {
 		auto Now = NowLexeme;
 		nxt();
 		Expression3();
+		Poliz.push_back(Now);
 		Control.Update(Now);
 	}
 }
@@ -392,11 +533,12 @@ void Expression() {
 		auto Now = NowLexeme;
 		nxt();
 		Expression2();
+		Poliz.push_back(Now);
 		Control.Update(Now);
 	}
 }
 
-void Declare() { 
+void Declare(bool flag = 0) { 
 	std::string type;
 	int k = 0;
 	std::string name;
@@ -405,12 +547,14 @@ void Declare() {
 			type = NowLexeme.name;
 			nxt();
 			if (NowLexeme.type == types::IDENTIFIER) {
+				Poliz.push_back(NowLexeme);
 				name = NowLexeme.name;
 				nxt();
 				while (NowLexeme.name == "[") {
 					k++;
 					nxt();
-					if (NowLexeme.type == types::NUMBER) {
+					if (NowLexeme.type == types::NUMBER && !count(NowLexeme.name.begin(), NowLexeme.name.end(), '.')) {
+						Poliz.push_back(NowLexeme);
 						nxt();
 						if (NowLexeme.name == "]") {
 							nxt();
@@ -420,6 +564,11 @@ void Declare() {
 					Error();
 				}
 				if (NowLexeme.type == types::DELIMETED) {
+					if (flag) {
+						FuncControl.AddArguments(name, type);
+					}
+					Poliz.push_back({ types::NUMBER, std::to_string(k) });
+					Poliz.push_back({ types::KEYWORD, type });
 					Tree.Push(name, type, k);
 					return;
 				}
@@ -429,40 +578,60 @@ void Declare() {
 	Error();
 }
 
-void Arguments() {
+void Arguments(bool IsMain) { 
 	if (NowLexeme.name != "(")
 		Error();
 	nxt();
 	bool flag = 1;
 	while (NowLexeme.type == types::KEYWORD) {
-		FuncControl.AddArguments(NowLexeme.name);
 		if (!flag)
 			Error();
-		Declare();
+		Declare(1);
 		if (NowLexeme.name != ",")
 			flag = 0;
 		else
 			nxt();
 	}
+	if (!IsMain)
+		Poliz.push_back({ types::Jump, "!GO" });
 	if (NowLexeme.name != ")")
 		Error();
 	nxt();
 }
 
-void Func() {
+void Func() { 
 	if (NowLexeme.type == types::KEYWORD && (isType(NowLexeme.name) 
 		|| isMass(NowLexeme.name) || NowLexeme.name == "void")) {
 		std::string type = NowLexeme.name;
 		nxt();
 		if (NowLexeme.type == types::IDENTIFIER || NowLexeme.name == "main") {
-			Registry[NowLexeme.name] = Poliz.size();
+			bool IsMain = NowLexeme.name == "main";
+			auto IsName = NowLexeme.name;
+			
+			int p1 = Poliz.size();
+			if (!IsMain) {
+				Poliz.push_back({ types::NUMBER, "_" });
+				Poliz.push_back({ types::Jump, "!" });
+			}
+			else {
+				Poliz.push_back({ types::Unknow, "NewTID" });
+			}
+			Registry[IsName].first = Poliz.size();
 			FuncControl.AddFunc(NowLexeme.name, type);
 			nxt();
 			Tree.CreateTID();
-			Arguments();
+			Arguments(IsMain);
+			Registry[IsName].second = Poliz.size();
 			Block(0);
-
 			Tree.UpTree();
+			Poliz.push_back({types::Unknow, "CloseTID"});
+			if (!IsMain) {
+				Poliz.push_back({types::Jump, "!GO"});
+				Poliz[p1].name = std::to_string(Poliz.size());
+			}
+			else {
+				Poliz.push_back({ types::KEYWORD, "Exit" });
+			}
 			return;
 		}
 	}
@@ -476,7 +645,7 @@ void inGlobal() {
 		return;
 	}
 	else {
-		Declare();
+		Declare(0);
 		if (NowLexeme.name == ";") {
 			return;
 		}
@@ -491,15 +660,16 @@ void Start() {
 	}
 }
 
-void SyntaxAnalzer() {
+bool SyntaxAnalzer() {
 	try {
 		Start();
 		if (!Geter.Empty()) {
 			throw std::string("Not Empty Lexemes");
 		}
-		std::cout << "OK";
+		return 1;
 	}
 	catch (std::string str){
 		std::cout << str;
+		return 0;
 	}
 }

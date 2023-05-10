@@ -60,7 +60,7 @@ private:
 	std::vector <char> DELIMETED = { ',', ';', ' ', '(', ')', '{', '}', '\'', '"', '\n', '[', ']', '\t'};
 	std::vector <char> OPERATION = { '*', '/', '-', '+', '%', '^', '<', '>', '&', '|' };
 	std::vector <std::string> KEYWORD = { "for", "while", "and", "or", "string", "int", "int64", "main", "cin",
-	"cout", "float", "if", "else", "endl", "return", "char", "bool", "void", "func", "==", "=", "!=", "\\n"};
+	"cout", "float", "if", "else", "endl", "return", "char", "bool", "void", "func", "==", "=", "!=", "\\n", "true", "false"};
 
 	types GetType(const std::string& s) {
 		if (std::count(KEYWORD.begin(), KEYWORD.end(), s))

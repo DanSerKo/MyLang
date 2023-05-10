@@ -12,7 +12,8 @@ enum types {
 	IDENTIFIER,
 	NUMBER, 
 	Unknow,
-	Jump
+	Jump,
+	STRING
 };
 
 struct Lexeme {
